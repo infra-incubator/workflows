@@ -49,8 +49,9 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup werf
-        uses: werf/actions/install@v2
+      - name: Setup Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v3
