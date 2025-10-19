@@ -1,0 +1,97 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: false
+        default: 'dev'
+        type: string
+        description: 'Target environment (dev, staging, prod)'
+      namespace:
+        required: false
+        type: string
+        description: 'Kubernetes namespace (defaults to environment name)'
+      auto_approve:
+        required: false
+        type: boolean
+        default: false
+        description: 'Auto approve deployment without manual confirmation'
+      image_tag:
+        required: false
+        type: string
+        default: 'latest'
+        description: 'Image tag to deploy'
+    secrets:
+      REGISTRY_HOST:
+        required: true
+      REGISTRY_REPO:
+        required: true
+        description: 'Repository name (without host) in format: /org/repo'
+      REGISTRY_USERNAME:
+        required: true
+      REGISTRY_PASSWORD:
+        required: true
+      KUBE_CONFIG:
+        required: true
+        description: 'Base64 encoded kubeconfig for target cluster'
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: [ self-hosted, k3s, infra ]
+    environment:
+      name: ${{ inputs.environment }}
+      url: https://${{ inputs.environment }}.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup werf
+        uses: werf/actions/install@v2
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure Kubernetes
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Login to Container Registry
+        run: |
+          werf cr login --insecure-registry=true \
+            --username ${{ secrets.REGISTRY_USERNAME }} \
+            --password ${{ secrets.REGISTRY_PASSWORD }} \
+            ${{ secrets.REGISTRY_HOST }}
+
+      - name: Deploy to environment
+        env:
+          WERF_REPO: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}
+          WERF_NAMESPACE: ${{ inputs.namespace || inputs.environment }}
+          WERF_ENV: ${{ inputs.environment }}
+        run: |
+          werf deploy \
+            --insecure-registry=true \
+            --set "global.image.tag=${{ inputs.image_tag }}" \
+            ${{ inputs.auto_approve && '--auto-approve' || '' }}
+
+      - name: Verify Deployment
+        env:
+          NAMESPACE: ${{ inputs.namespace || inputs.environment }}
+        run: |
+          kubectl get pods -n $NAMESPACE
+          kubectl get services -n $NAMESPACE
+          kubectl get ingress -n $NAMESPACE
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          echo "### Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Namespace:** ${{ inputs.namespace || inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Tag:** ${{ inputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
