@@ -63,20 +63,24 @@ jobs:
 
       - name: Login to Container Registry
         run: |
-          werf cr login --insecure-registry=true \
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | helm registry login \
+            ${{ secrets.REGISTRY_HOST }} \
             --username ${{ secrets.REGISTRY_USERNAME }} \
-            --password ${{ secrets.REGISTRY_PASSWORD }} \
-            ${{ secrets.REGISTRY_HOST }}
+            --password-stdin
 
       - name: Deploy to environment
         env:
-          WERF_REPO: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}
-          WERF_NAMESPACE: ${{ inputs.namespace || inputs.environment }}
-          WERF_ENV: ${{ inputs.environment }}
-          WERF_KUBECONFIG_BASE64: ${{ secrets.KUBE_CONFIG }}
+          NAMESPACE: ${{ inputs.namespace || inputs.environment }}
+          ENVIRONMENT: ${{ inputs.environment }}
         run: |
-          werf converge \
-            --insecure-registry=true 
+          helm upgrade --install my-release universal/universal-helm \
+            --namespace $NAMESPACE \
+            --create-namespace \
+            --set image.repository=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }} \
+            --set image.tag=${{ inputs.image_tag }} \
+            --set environment=$ENVIRONMENT \
+            --values .helm/values-$ENVIRONMENT.yaml \
+            --wait
 
       - name: Verify Deployment
         env:
