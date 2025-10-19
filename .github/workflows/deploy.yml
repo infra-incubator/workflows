@@ -76,7 +76,7 @@ jobs:
         run: |
           helm registry login ${{ secrets.REGISTRY_HOST }} --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }}
           
-          helm upgrade --install my-release oci://${{ secrets.REGISTRY_HOST }}/charts/universal-helm \
+          helm upgrade --install my-release oci://${{ secrets.REGISTRY_HOST }}/universal-helm/universal-helm \
             --namespace $NAMESPACE \
             --create-namespace \
             --set image.repository=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }} \
