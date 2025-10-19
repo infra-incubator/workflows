@@ -73,11 +73,10 @@ jobs:
           WERF_REPO: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}
           WERF_NAMESPACE: ${{ inputs.namespace || inputs.environment }}
           WERF_ENV: ${{ inputs.environment }}
+          WERF_KUBECONFIG_BASE64: ${{ secrets.KUBE_CONFIG }}
         run: |
-          werf deploy \
-            --insecure-registry=true \
-            --set "global.image.tag=${{ inputs.image_tag }}" \
-            ${{ inputs.auto_approve && '--auto-approve' || '' }}
+          werf converge \
+            --insecure-registry=true 
 
       - name: Verify Deployment
         env:
