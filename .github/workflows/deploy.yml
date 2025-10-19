@@ -108,9 +108,8 @@ jobs:
             --set image.repository=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }} \
             --set image.tag=${{ inputs.image_tag }} \
             --set environment=$ENVIRONMENT \
-            --values .helm/values-$ENVIRONMENT.yaml \
-            --wait
-
+            --values .helm/values-$ENVIRONMENT.yaml 
+          
       - name: Verify Deployment
         env:
           NAMESPACE: ${{ inputs.namespace || inputs.environment }}
