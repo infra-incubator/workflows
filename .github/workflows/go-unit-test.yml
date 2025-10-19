@@ -1,0 +1,48 @@
+name: Go Tests
+
+on:
+  workflow_call:
+    inputs:
+      go_version:
+        required: false
+        type: string
+        default: '1.25'
+        description: 'Go version to use'
+    outputs:
+      tests_passed:
+        description: 'Whether tests passed'
+        value: ${{ jobs.test.outputs.tests_passed }}
+
+jobs:
+  test:
+    name: Go Tests
+    runs-on: [ self-hosted, k3s, infra ]
+    outputs:
+      tests_passed: ${{ steps.test-result.outputs.result }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ inputs.go_version }}
+          cache: true
+
+      - name: Run tests with coverage
+        uses: robherley/go-test-action@v0
+        with:
+          moduleDirectory: .
+          testArguments: '-v -race -coverprofile=coverage.out'
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Set test result
+        id: test-result
+        if: success()
+        run: echo "result=true" >> $GITHUB_OUTPUT

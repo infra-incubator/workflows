@@ -1,0 +1,34 @@
+name: Go Lint
+
+on:
+  workflow_call:
+    inputs:
+      go_version:
+        required: false
+        type: string
+        default: '1.25'
+        description: 'Go version to use'
+    outputs:
+      lint_passed:
+        description: 'Whether linting passed'
+        value: ${{ jobs.lint.outputs.lint_passed }}
+
+jobs:
+  lint:
+    name: Go Lint
+    runs-on: [ self-hosted, k3s, infra ]
+    outputs:
+      lint_passed: ${{ steps.lint-result.outputs.result }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ inputs.go_version }}
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+            version: v2.5
+
+      - name: Set lint result
+        id: lint-result
+        run: echo "result=true" >> $GITHUB_OUTPUT

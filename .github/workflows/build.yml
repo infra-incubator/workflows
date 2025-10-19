@@ -1,0 +1,49 @@
+name: Build & Publish with Werf
+
+on:
+  workflow_call:
+    inputs:
+      skip_security:
+        required: false
+        type: boolean
+        default: false
+        description: 'Skip security checks (use when security is handled by caller)'
+    secrets:
+      REGISTRY_HOST:
+        required: true
+      REGISTRY_REPO:
+        required: true
+      REGISTRY_USERNAME:
+        required: true
+      REGISTRY_PASSWORD:
+        required: true
+
+jobs:
+  build:
+    name: Build and Publish
+    runs-on: [ self-hosted, k3s, infra ]
+    if: always() && (inputs.skip_security == true || needs.security.outputs.security_passed == 'true')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup werf
+        uses: werf/actions/install@v2
+
+      - name: Build and publish image (main branch)
+        if: github.ref == 'refs/heads/main'
+        env:
+          WERF_REPO: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}
+        run: |
+          werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
+          werf build --add-custom-tag latest --insecure-registry=true
+
+      - name: Build and publish image (other branches)
+        if: github.ref != 'refs/heads/main'
+        env:
+          WERF_REPO: ${{ secrets.REGISTRY_REPO }}
+        run: |
+          werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
+          werf build --tag-git-branch

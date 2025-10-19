@@ -1,0 +1,175 @@
+name: Universal Security Checks
+
+on:
+  workflow_call:
+    inputs:
+      organization:
+        required: false
+        type: string
+        description: 'Organization name (auto-detected if not provided)'
+      min_permission_level:
+        required: false
+        type: string
+        default: 'write'
+      allowed_events:
+        required: false
+        type: string
+        default: 'push,pull_request,workflow_dispatch'
+      verify_org_exists:
+        required: false
+        type: boolean
+        default: true
+        description: 'Verify that the organization actually exists'
+    outputs:
+      organization:
+        description: 'Detected or provided organization name'
+        value: ${{ jobs.security.outputs.organization }}
+      security_passed:
+        description: 'Security checks result'
+        value: ${{ jobs.security.outputs.passed }}
+
+jobs:
+  security:
+    name: Security Validation
+    runs-on: ubuntu-latest
+    outputs:
+      organization: ${{ steps.detect-org.outputs.org_name }}
+      passed: ${{ steps.final.outputs.passed }}
+    steps:
+      - name: Detect organization
+        id: detect-org
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let orgName = '${{ inputs.organization }}';
+            
+            if (!orgName || orgName === '') {
+              orgName = context.repo.owner;
+              console.log(`Auto-detected organization: ${orgName}`);
+            } else {
+              console.log(`Using provided organization: ${orgName}`);
+            }
+            
+            if (!orgName || orgName.length === 0) {
+              core.setFailed('Organization name is empty');
+              return;
+            }
+            
+            const validNamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
+            if (!validNamePattern.test(orgName)) {
+              core.setFailed(`Invalid organization name format: ${orgName}`);
+              return;
+            }
+            
+            core.setOutput('org_name', orgName);
+
+      - name: Verify organization exists
+        if: inputs.verify_org_exists == true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const orgName = '${{ steps.detect-org.outputs.org_name }}';
+            
+            try {
+              const orgInfo = await github.rest.orgs.get({
+                org: orgName
+              });
+            
+              console.log(`Organization verified: ${orgInfo.data.login}`);
+              console.log(`Type: ${orgInfo.data.type}`);
+              console.log(`Public repos: ${orgInfo.data.public_repos}`);
+            
+              if (orgInfo.data.type !== 'Organization') {
+                core.setFailed(`${orgName} is not an organization (type: ${orgInfo.data.type})`);
+                return;
+              }
+            
+            } catch (error) {
+              if (error.status === 404) {
+                core.setFailed(`Organization ${orgName} not found or not accessible`);
+                return;
+              }
+              console.error('Error verifying organization:', error);
+              throw error;
+            }
+
+      - name: Check repository ownership
+        run: |
+          DETECTED_ORG="${{ steps.detect-org.outputs.org_name }}"
+          REPO_OWNER="${{ github.repository_owner }}"
+          
+          if [[ "$DETECTED_ORG" != "$REPO_OWNER" ]]; then
+            echo "Organization mismatch: detected '$DETECTED_ORG', but repository owner is '$REPO_OWNER'"
+            exit 1
+          fi
+          
+          echo "Repository ownership verified: $REPO_OWNER"
+
+      - name: Validate event type
+        run: |
+          ALLOWED_EVENTS="${{ inputs.allowed_events }}"
+          if [[ "$ALLOWED_EVENTS" != *"$GITHUB_EVENT_NAME"* ]]; then
+            echo "Event type $GITHUB_EVENT_NAME is not allowed. Allowed: $ALLOWED_EVENTS"
+            exit 1
+          fi
+
+      - name: Check organization membership and permissions
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const org = '${{ steps.detect-org.outputs.org_name }}';
+            const actor = context.actor;
+            const minPermission = '${{ inputs.min_permission_level }}';
+
+            const permissionLevels = {
+              'read': 1,
+              'triage': 2,
+              'write': 3,
+              'maintain': 4,
+              'admin': 5
+            };
+
+            try {
+              // Сначала проверяем права доступа к репозиторию
+              const permission = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: actor
+              });
+
+              const userLevel = permissionLevels[permission.data.permission] || 0;
+              const requiredLevel = permissionLevels[minPermission] || 3;
+
+              if (userLevel < requiredLevel) {
+                core.setFailed(`User ${actor} has insufficient permissions: ${permission.data.permission} (required: ${minPermission})`);
+                return;
+              }
+
+              console.log(`Security checks passed for user ${actor} with ${permission.data.permission} permission`);
+
+              // Только после успешной проверки прав пытаемся проверить членство
+              try {
+                await github.rest.orgs.checkMembershipForUser({
+                  org: org,
+                  username: actor
+                });
+                console.log(`User ${actor} is a member of ${org}`);
+              } catch (membershipError) {
+                if (membershipError.status === 404) {
+                  console.log(`Warning: Could not verify membership in ${org}, but user has sufficient repository permissions`);
+                } else {
+                  throw membershipError;
+                }
+              }
+
+            } catch (error) {
+              if (error.status === 403) {
+                core.setFailed(`User ${actor} does not have access to this repository`);
+                return;
+              }
+              throw error;
+            }
+
+      - name: Set output
+        id: final
+        run: echo "passed=true" >> $GITHUB_OUTPUT

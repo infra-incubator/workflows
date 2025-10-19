@@ -1,0 +1,6 @@
+.idea
+.github
+.dockerignore
+.golangci.yml
+werf.yml
+Dockerfile

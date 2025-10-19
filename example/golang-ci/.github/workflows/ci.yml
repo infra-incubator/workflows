@@ -1,0 +1,43 @@
+name: Go CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+
+jobs:
+  security:
+    uses: liquidstore/infra/.github/workflows/security.yml@main
+    with:
+      min_permission_level: 'write'
+      allowed_events: 'push,pull_request,workflow_dispatch'
+
+  lint:
+    needs: security
+    if: needs.security.outputs.security_passed == 'true'
+    uses: liquidstore/infra/.github/workflows/go-lint.yml@main
+    with:
+      go_version: '1.25'
+
+  test:
+    needs: security
+    if: needs.security.outputs.security_passed == 'true'
+    uses: liquidstore/infra/.github/workflows/go-unit-test.yml@main
+    with:
+      go_version: '1.25'
+
+  build:
+    needs: [security, lint, test]
+    if: needs.security.outputs.security_passed == 'true'
+    uses: liquidstore/infra/.github/workflows/build.yml@main
+    with:
+      skip_security: true
+    secrets:
+      REGISTRY_HOST: ${{ secrets.REGISTRY_HOST }}
+      REGISTRY_REPO: ${{ secrets.REGISTRY_REPO }}
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
