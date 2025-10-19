@@ -74,7 +74,7 @@ jobs:
           NAMESPACE: ${{ inputs.namespace || inputs.environment }}
           ENVIRONMENT: ${{ inputs.environment }}
         run: |
-          helm upgrade --install my-release universal-helm/universal-helm \
+          helm upgrade --install my-release universal-helm \
             --namespace $NAMESPACE \
             --create-namespace \
             --set image.repository=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }} \
