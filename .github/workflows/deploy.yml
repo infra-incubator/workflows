@@ -74,7 +74,7 @@ jobs:
           NAMESPACE: ${{ inputs.namespace || inputs.environment }}
           ENVIRONMENT: ${{ inputs.environment }}
         run: |
-          helm registry login harbor.shrtrnr.com --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }}
+          helm registry ${{ secrets.REGISTRY_HOST }} --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }}
           
           helm upgrade --install my-release oci://${{ secrets.REGISTRY_HOST }}/charts/universal-helm \
             --namespace $NAMESPACE \
