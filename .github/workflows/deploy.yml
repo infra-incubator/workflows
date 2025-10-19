@@ -69,13 +69,38 @@ jobs:
             --username ${{ secrets.REGISTRY_USERNAME }} \
             --password-stdin
 
+      - name: Check and create image pull secret
+        env:
+          NAMESPACE: ${{ inputs.namespace || inputs.environment }}
+        run: |
+          # Check if namespace exists
+          if ! kubectl get namespace $NAMESPACE >/dev/null 2>&1; then
+            echo "Namespace $NAMESPACE doesn't exist, will be created by helm"
+            NAMESPACE_EXISTS=false
+          else
+            echo "Namespace $NAMESPACE already exists"
+            NAMESPACE_EXISTS=true
+          fi
+
+          # Check if image pull secret exists (only if namespace exists)
+          if [ "$NAMESPACE_EXISTS" = "true" ] && kubectl get secret registry-secret -n $NAMESPACE >/dev/null 2>&1; then
+            echo "Image pull secret already exists"
+          else
+           kubectl create secret docker-registry registry-secret \
+              --docker-server=${{ secrets.REGISTRY_HOST }} \
+              --docker-username=${{ secrets.REGISTRY_USERNAME }} \
+              --docker-password=${{ secrets.REGISTRY_PASSWORD }} \
+              --namespace $NAMESPACE
+            echo "Image pull secret created successfully"
+          fi
+
       - name: Deploy to environment
         env:
           NAMESPACE: ${{ inputs.namespace || inputs.environment }}
           ENVIRONMENT: ${{ inputs.environment }}
         run: |
           helm registry login ${{ secrets.REGISTRY_HOST }} --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }}
-          
+
           helm upgrade --install my-release oci://${{ secrets.REGISTRY_HOST }}/universal-helm/universal-helm \
             --namespace $NAMESPACE \
             --create-namespace \
