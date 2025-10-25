@@ -32,8 +32,8 @@ jobs:
       - name: Run tests with coverage
         uses: robherley/go-test-action@v0
         with:
-          moduleDirectory: ./...
-          testArguments: '-v -race -coverprofile=coverage.out'
+          moduleDirectory: .
+          testArguments: '-v -race -coverprofile=coverage.out ./...'
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
