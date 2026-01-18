@@ -121,7 +121,7 @@ jobs:
 
           ROLLOUT_ARGS=""
           if [ "$FORCE_ROLLOUT" = "true" ]; then
-            ROLLOUT_ARGS="--set podAnnotations.deployedAt=$(date +%s)"
+            ROLLOUT_ARGS="--set-string podAnnotations.deployedAt=$(date +%s)"
           fi
 
           helm upgrade --install ${{ inputs.app_name }} oci://${{ secrets.REGISTRY_HOST }}/universal-helm/universal-helm \
