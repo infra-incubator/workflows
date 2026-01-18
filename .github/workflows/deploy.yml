@@ -26,6 +26,11 @@ on:
         type: string
         default: 'latest'
         description: 'Image tag to deploy'
+      values_file:
+        required: false
+        type: string
+        default: ''
+        description: 'Custom values file path (defaults to .helm/values-{environment}.yaml)'
     secrets:
       REGISTRY_HOST:
         required: true
@@ -104,6 +109,7 @@ jobs:
         env:
           NAMESPACE: ${{ inputs.namespace || inputs.environment }}
           ENVIRONMENT: ${{ inputs.environment }}
+          VALUES_FILE: ${{ inputs.values_file || format('.helm/values-{0}.yaml', inputs.environment) }}
         run: |
           helm registry login ${{ secrets.REGISTRY_HOST }} --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }}
 
@@ -114,7 +120,7 @@ jobs:
             --set image.tag=${{ inputs.image_tag }} \
             --set image.pullPolicy=Always \
             --set environment=$ENVIRONMENT \
-            --values .helm/values-$ENVIRONMENT.yaml 
+            --values $VALUES_FILE
 
       - name: Verify Deployment
         env:
