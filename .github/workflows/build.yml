@@ -8,6 +8,11 @@ on:
         type: boolean
         default: false
         description: 'Skip security checks (use when security is handled by caller)'
+      multi_image:
+        required: false
+        type: boolean
+        default: false
+        description: 'Set to true for repos with multiple images in werf.yaml'
     secrets:
       REGISTRY_HOST:
         required: true
@@ -38,7 +43,11 @@ jobs:
           WERF_REPO: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}
         run: |
           werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
-          werf build --add-custom-tag latest --insecure-registry=true
+          if [ "${{ inputs.multi_image }}" == "true" ]; then
+            werf build --add-custom-tag %image%-latest --insecure-registry=true
+          else
+            werf build --add-custom-tag latest --insecure-registry=true
+          fi
 
       - name: Build and publish image (other branches)
         if: github.ref != 'refs/heads/main'
@@ -46,4 +55,8 @@ jobs:
           WERF_REPO: ${{ secrets.REGISTRY_REPO }}
         run: |
           werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
-          werf build --tag-git-branch
+          if [ "${{ inputs.multi_image }}" == "true" ]; then
+            werf build --add-custom-tag %image%-${GITHUB_REF_NAME} --insecure-registry=true
+          else
+            werf build --tag-git-branch --insecure-registry=true
+          fi
