@@ -31,6 +31,11 @@ on:
         type: string
         default: ''
         description: 'Custom values file path (defaults to .helm/values-{environment}.yaml)'
+      force_rollout:
+        required: false
+        type: boolean
+        default: true
+        description: 'Force rollout even if image tag unchanged (adds timestamp annotation)'
     secrets:
       REGISTRY_HOST:
         required: true
@@ -110,8 +115,14 @@ jobs:
           NAMESPACE: ${{ inputs.namespace || inputs.environment }}
           ENVIRONMENT: ${{ inputs.environment }}
           VALUES_FILE: ${{ inputs.values_file || format('.helm/values-{0}.yaml', inputs.environment) }}
+          FORCE_ROLLOUT: ${{ inputs.force_rollout }}
         run: |
           helm registry login ${{ secrets.REGISTRY_HOST }} --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }}
+
+          ROLLOUT_ARGS=""
+          if [ "$FORCE_ROLLOUT" = "true" ]; then
+            ROLLOUT_ARGS="--set podAnnotations.deployedAt=$(date +%s)"
+          fi
 
           helm upgrade --install ${{ inputs.app_name }} oci://${{ secrets.REGISTRY_HOST }}/universal-helm/universal-helm \
             --namespace $NAMESPACE \
@@ -120,6 +131,7 @@ jobs:
             --set image.tag=${{ inputs.image_tag }} \
             --set image.pullPolicy=Always \
             --set environment=$ENVIRONMENT \
+            $ROLLOUT_ARGS \
             --values $VALUES_FILE
 
       - name: Verify Deployment
