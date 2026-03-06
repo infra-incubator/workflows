@@ -1,0 +1,6 @@
+project: example-python
+configVersion: 1
+
+---
+image: app
+dockerfile: Dockerfile
