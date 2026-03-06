@@ -1,0 +1,64 @@
+name: Python Lint
+
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        required: false
+        type: string
+        default: '3.12'
+        description: 'Python version to use'
+      ruff_version:
+        required: false
+        type: string
+        default: 'latest'
+        description: 'Ruff version to use'
+      ty_version:
+        required: false
+        type: string
+        default: 'latest'
+        description: 'ty version to use'
+      skip_format_check:
+        required: false
+        type: boolean
+        default: false
+        description: 'Skip ruff format check'
+      skip_type_check:
+        required: false
+        type: boolean
+        default: false
+        description: 'Skip ty type check'
+    outputs:
+      lint_passed:
+        description: 'Whether all checks passed'
+        value: ${{ jobs.lint.outputs.lint_passed }}
+
+jobs:
+  lint:
+    name: Python Lint
+    runs-on: [ self-hosted, k3s, infra ]
+    outputs:
+      lint_passed: ${{ steps.result.outputs.result }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install ${{ inputs.python_version }}
+
+      - name: Ruff Check (lint)
+        run: uvx ruff@${{ inputs.ruff_version }} check .
+
+      - name: Ruff Format Check
+        if: ${{ !inputs.skip_format_check }}
+        run: uvx ruff@${{ inputs.ruff_version }} format --check .
+
+      - name: ty Type Check
+        if: ${{ !inputs.skip_type_check }}
+        run: uvx ty@${{ inputs.ty_version }} check .
+
+      - name: Set result
+        id: result
+        run: echo "result=true" >> $GITHUB_OUTPUT
