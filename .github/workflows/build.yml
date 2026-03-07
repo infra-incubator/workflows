@@ -17,7 +17,7 @@ on:
         required: false
         type: boolean
         default: false
-        description: 'Force full rebuild ignoring werf cache'
+        description: 'Force full rebuild by purging Docker build cache'
     outputs:
       git_sha:
         description: 'Short git SHA for image tagging'
@@ -53,25 +53,26 @@ jobs:
       - name: Setup werf
         uses: werf/actions/install@v2
 
-      - name: Prune stale Docker build cache
-        run: docker builder prune -f --filter "until=24h" || true
+      - name: Prune Docker build cache
+        run: |
+          if [ "${{ inputs.force_rebuild }}" == "true" ]; then
+            echo "Force rebuild requested — purging all Docker build cache"
+            docker builder prune -af || true
+          else
+            docker builder prune -f --filter "until=24h" || true
+          fi
 
       - name: Build and publish image (main branch)
         if: github.ref == 'refs/heads/main'
         env:
           WERF_REPO: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}
           SHA_SHORT: ${{ steps.vars.outputs.sha_short }}
-          WERF_FORCE: ${{ inputs.force_rebuild && '1' || '' }}
         run: |
-          FORCE_FLAG=""
-          if [ "$WERF_FORCE" = "1" ]; then
-            FORCE_FLAG="--force"
-          fi
           werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
           if [ "${{ inputs.multi_image }}" == "true" ]; then
-            werf build $FORCE_FLAG --add-custom-tag %image%-latest --add-custom-tag %image%-${SHA_SHORT} --insecure-registry=true
+            werf build --add-custom-tag %image%-latest --add-custom-tag %image%-${SHA_SHORT} --insecure-registry=true
           else
-            werf build $FORCE_FLAG --add-custom-tag latest --add-custom-tag ${SHA_SHORT} --insecure-registry=true
+            werf build --add-custom-tag latest --add-custom-tag ${SHA_SHORT} --insecure-registry=true
           fi
 
       - name: Build and publish image (other branches)
@@ -79,15 +80,10 @@ jobs:
         env:
           WERF_REPO: ${{ secrets.REGISTRY_REPO }}
           SHA_SHORT: ${{ steps.vars.outputs.sha_short }}
-          WERF_FORCE: ${{ inputs.force_rebuild && '1' || '' }}
         run: |
-          FORCE_FLAG=""
-          if [ "$WERF_FORCE" = "1" ]; then
-            FORCE_FLAG="--force"
-          fi
           werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
           if [ "${{ inputs.multi_image }}" == "true" ]; then
-            werf build $FORCE_FLAG --add-custom-tag %image%-${GITHUB_REF_NAME} --add-custom-tag %image%-${SHA_SHORT} --insecure-registry=true
+            werf build --add-custom-tag %image%-${GITHUB_REF_NAME} --add-custom-tag %image%-${SHA_SHORT} --insecure-registry=true
           else
-            werf build $FORCE_FLAG --tag-git-branch --add-custom-tag ${SHA_SHORT} --insecure-registry=true
+            werf build --tag-git-branch --add-custom-tag ${SHA_SHORT} --insecure-registry=true
           fi
