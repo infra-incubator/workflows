@@ -13,11 +13,6 @@ on:
         type: boolean
         default: false
         description: 'Set to true for repos with multiple images in werf.yaml'
-      force_rebuild:
-        required: false
-        type: boolean
-        default: false
-        description: 'Force full rebuild by purging werf and Docker caches'
     outputs:
       git_sha:
         description: 'Short git SHA for image tagging'
@@ -53,17 +48,6 @@ jobs:
       - name: Setup werf
         uses: werf/actions/install@v2
 
-      - name: Purge caches for force rebuild
-        if: inputs.force_rebuild
-        env:
-          WERF_REPO: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}
-        run: |
-          werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
-          echo "Purging werf stages from registry..."
-          werf purge --insecure-registry=true || true
-          echo "Pruning Docker build cache..."
-          docker builder prune -af || true
-
       - name: Build and publish image (main branch)
         if: github.ref == 'refs/heads/main'
         env:
@@ -72,9 +56,9 @@ jobs:
         run: |
           werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
           if [ "${{ inputs.multi_image }}" == "true" ]; then
-            werf build --add-custom-tag %image%-latest --add-custom-tag %image%-${SHA_SHORT} --insecure-registry=true
+            werf build --build-arg REBUILD_HASH=${SHA_SHORT} --add-custom-tag %image%-latest --add-custom-tag %image%-${SHA_SHORT} --insecure-registry=true
           else
-            werf build --add-custom-tag latest --add-custom-tag ${SHA_SHORT} --insecure-registry=true
+            werf build --build-arg REBUILD_HASH=${SHA_SHORT} --add-custom-tag latest --add-custom-tag ${SHA_SHORT} --insecure-registry=true
           fi
 
       - name: Build and publish image (other branches)
@@ -85,7 +69,7 @@ jobs:
         run: |
           werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
           if [ "${{ inputs.multi_image }}" == "true" ]; then
-            werf build --add-custom-tag %image%-${GITHUB_REF_NAME} --add-custom-tag %image%-${SHA_SHORT} --insecure-registry=true
+            werf build --build-arg REBUILD_HASH=${SHA_SHORT} --add-custom-tag %image%-${GITHUB_REF_NAME} --add-custom-tag %image%-${SHA_SHORT} --insecure-registry=true
           else
-            werf build --tag-git-branch --add-custom-tag ${SHA_SHORT} --insecure-registry=true
+            werf build --build-arg REBUILD_HASH=${SHA_SHORT} --tag-git-branch --add-custom-tag ${SHA_SHORT} --insecure-registry=true
           fi
