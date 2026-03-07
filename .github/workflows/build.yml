@@ -17,7 +17,7 @@ on:
         required: false
         type: boolean
         default: false
-        description: 'Force full rebuild by purging Docker build cache'
+        description: 'Force full rebuild by purging werf and Docker caches'
     outputs:
       git_sha:
         description: 'Short git SHA for image tagging'
@@ -53,14 +53,16 @@ jobs:
       - name: Setup werf
         uses: werf/actions/install@v2
 
-      - name: Prune Docker build cache
+      - name: Purge caches for force rebuild
+        if: inputs.force_rebuild
+        env:
+          WERF_REPO: ${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }}
         run: |
-          if [ "${{ inputs.force_rebuild }}" == "true" ]; then
-            echo "Force rebuild requested — purging all Docker build cache"
-            docker builder prune -af || true
-          else
-            docker builder prune -f --filter "until=24h" || true
-          fi
+          werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
+          echo "Purging werf stages from registry..."
+          werf purge --insecure-registry=true || true
+          echo "Pruning Docker build cache..."
+          docker builder prune -af || true
 
       - name: Build and publish image (main branch)
         if: github.ref == 'refs/heads/main'
