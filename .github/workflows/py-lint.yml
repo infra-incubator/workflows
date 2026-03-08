@@ -55,9 +55,13 @@ jobs:
         if: ${{ !inputs.skip_format_check }}
         run: uvx ruff@${{ inputs.ruff_version }} format --check .
 
+      - name: Install dependencies for type checking
+        if: ${{ !inputs.skip_type_check }}
+        run: uv sync --dev --no-install-project
+
       - name: ty Type Check
         if: ${{ !inputs.skip_type_check }}
-        run: uvx ty@${{ inputs.ty_version }} check .
+        run: uv run ty check .
 
       - name: Set result
         id: result
