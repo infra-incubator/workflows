@@ -62,12 +62,6 @@ jobs:
         run: |
           uv run coverage report --fail-under=${{ inputs.coverage_threshold }}
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-          flags: unittests
-
       - name: Set result
         id: result
         if: success()
