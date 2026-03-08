@@ -61,7 +61,7 @@ jobs:
 
       - name: ty Type Check
         if: ${{ !inputs.skip_type_check }}
-        run: uv run ty check .
+        run: uvx ty@${{ inputs.ty_version }} check .
 
       - name: Set result
         id: result
