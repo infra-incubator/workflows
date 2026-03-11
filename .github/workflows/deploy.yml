@@ -36,6 +36,11 @@ on:
         type: boolean
         default: true
         description: 'Force rollout even if image tag unchanged (adds timestamp annotation)'
+      environment_url:
+        required: false
+        type: string
+        default: ''
+        description: 'URL for the GitHub environment deployment link'
     secrets:
       REGISTRY_HOST:
         required: true
@@ -57,7 +62,7 @@ jobs:
     runs-on: [ self-hosted, k3s, infra ]
     environment:
       name: ${{ inputs.environment }}
-      url: https://${{ inputs.environment }}.example.com
+      url: ${{ inputs.environment_url || format('https://{0}.example.com', inputs.environment) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
