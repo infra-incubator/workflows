@@ -45,6 +45,13 @@ jobs:
         id: vars
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
+      - name: Verify checkout
+        run: |
+          echo "Branch: $(git rev-parse --abbrev-ref HEAD)"
+          echo "Commit: $(git rev-parse HEAD)"
+          echo "Recent files in context:"
+          git ls-tree --name-only HEAD -- . | head -20
+
       - name: Setup werf
         uses: werf/actions/install@v2
 
@@ -69,7 +76,7 @@ jobs:
         run: |
           werf cr login --insecure-registry=true --username ${{ secrets.REGISTRY_USERNAME }} --password ${{ secrets.REGISTRY_PASSWORD }} ${{ secrets.REGISTRY_HOST }}
           if [ "${{ inputs.multi_image }}" == "true" ]; then
-            werf build --add-custom-tag %image%-${GITHUB_REF_NAME} --add-custom-tag %image%-${SHA_SHORT} --insecure-registry=true
+            werf build --dev --add-custom-tag %image%-${GITHUB_REF_NAME} --add-custom-tag %image%-${SHA_SHORT} --insecure-registry=true
           else
-            werf build --add-custom-tag ${GITHUB_REF_NAME} --add-custom-tag ${SHA_SHORT} --insecure-registry=true
+            werf build --dev --add-custom-tag ${GITHUB_REF_NAME} --add-custom-tag ${SHA_SHORT} --insecure-registry=true
           fi
