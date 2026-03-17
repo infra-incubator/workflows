@@ -133,7 +133,7 @@ jobs:
             --namespace $NAMESPACE \
             --create-namespace \
             --set image.repository=${{ secrets.REGISTRY_HOST }}${{ secrets.REGISTRY_REPO }} \
-            --set image.tag=${{ inputs.image_tag }} \
+            --set-string image.tag=${{ inputs.image_tag }} \
             --set image.pullPolicy=Always \
             --set environment=$ENVIRONMENT \
             $ROLLOUT_ARGS \
